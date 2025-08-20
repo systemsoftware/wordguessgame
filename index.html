@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Word Guess Game</title>
+    <style>
+      :root {
+        --primary: #646cff;
+        --primary-hover: #747bff;
+        --background: #1a1a1a;
+        --correct: #4ade80;
+        --incorrect: #ef4444;
+        --partial: #f97316;
+        --text: rgba(255, 255, 255, 0.87);
+        --border: #333;
+        --tile-size: min(64px, 10vw);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--background);
+        color: var(--text);
+        line-height: 1.5;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+      }
+
+      .container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        width: 100vw;
+      }
+
+      .header {
+        text-align: center;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .game-board {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+        gap: 20px;
+        overflow-y: auto;
+      }
+
+      .guesses {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: auto;
+      }
+
+      .guess-row {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+      }
+
+      .letter {
+        width: var(--tile-size);
+        height: var(--tile-size);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-weight: bold;
+        text-transform: uppercase;
+        color: white;
+        font-size: calc(var(--tile-size) * 0.5);
+        border: 2px solid var(--border);
+        animation: pop 0.3s;
+      }
+
+      @keyframes pop {
+        0% {
+          transform: scale(0.8);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      .correct {
+        background: var(--correct);
+        border-color: var(--correct);
+      }
+      .incorrect {
+        background: var(--incorrect);
+        border-color: var(--incorrect);
+      }
+      .partial {
+        background: var(--partial);
+        border-color: var(--partial);
+      }
+
+      .controls {
+        width: 100%;
+        max-width: 500px;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        margin-top: auto;
+      }
+
+      .input-group {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      input {
+        padding: 12px 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 16px;
+        background: var(--background);
+        color: var(--text);
+        flex: 1;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: var(--primary);
+      }
+
+      button {
+        padding: 12px 24px;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: all 0.2s;
+      }
+
+      button:hover {
+        background: var(--primary-hover);
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(4px);
+      }
+
+      .modal-content {
+        background: var(--background);
+        padding: 24px;
+        border-radius: 12px;
+        max-width: 400px;
+        width: 90%;
+        border: 1px solid var(--border);
+      }
+
+      .game-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 12px;
+        color: #666;
+      }
+
+      .code-display {
+        background: rgba(100, 108, 255, 0.1);
+        padding: 12px;
+        border-radius: 8px;
+        margin: 12px 0;
+        word-break: break-all;
+        font-family: monospace;
+      }
+
+      .toast {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        display: none;
+        z-index: 1000;
+      }
+
+      #credit {
+        font-size: xx-small;
+        text-align: center;
+        margin-top: 20px;
+        color: #666;
+      }
+      #credit * {
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toast" id="toast"></div>
+
+    <div class="container">
+      <div class="game-board">
+        <div class="guesses" id="guesses"></div>
+
+        <div class="controls">
+          <div class="input-group" id="inp">
+            <input
+              type="text"
+              id="guess-input"
+              placeholder="Enter your guess"
+              autocomplete="off"
+            />
+            <button id="guess-btn">Guess</button>
+          </div>
+
+          <div class="game-info">
+            <span id="tries">Tries: 0</span>
+            <button id="new-game-btn">Create Game</button>
+          </div>
+          <p
+            onclick="document.getElementById('credit').style.display='none'"
+            id="credit"
+          >
+            Random words provided by
+            <a href="https://random-word-api.herokuapp.com/" target="_blank"
+              >Random Word API</a
+            >
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="new-game-modal">
+      <div class="modal-content">
+        <h2>Create New Game</h2>
+        <p style="margin: 10px">Enter a word to generate a secret game code</p>
+        <div class="input-group">
+          <input
+            type="text"
+            id="new-word-input"
+            placeholder="Enter a word"
+            autocomplete="off"
+          />
+          <button id="create-game-btn">Create</button>
+        </div>
+        <div id="code-output"></div>
+        <button
+          style="width: 100%"
+          onclick="document.getElementById('new-game-modal').style.display='none'"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+
+    <script>
+      let gameState = {
+        word: "",
+        guesses: [],
+        tries: 0,
+      };
+
+      function showToast(message, duration = 3000) {
+        const toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.style.display = "block";
+        setTimeout(() => {
+          toast.style.display = "none";
+        }, duration);
+      }
+
+      // Simple encryption function (for demo purposes)
+      function encryptWord(word) {
+        return btoa(
+          word
+            .toLowerCase()
+            .split("")
+            .map((char) => String.fromCharCode(char.charCodeAt(0) + 5))
+            .join("")
+        );
+      }
+
+      // Simple decryption function (for demo purposes)
+      function decryptWord(code) {
+        try {
+          return atob(code)
+            .split("")
+            .map((char) => String.fromCharCode(char.charCodeAt(0) - 5))
+            .join("");
+        } catch {
+          return null;
+        }
+      }
+
+      // Initialize game from URL parameter
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      if (code) {
+        initializeGame(code);
+      } else {
+        let url = "https://random-word-api.herokuapp.com/word";
+        if (params.has("length")) {
+          url += `?length=${params.get("length")}`;
+        }
+        fetch(url)
+          .then((response) => response.json())
+          .then((data) => {
+            showToast(`The word is ${data[0].length} letters long!`);
+            console.log(data[0]);
+            initializeGame(encryptWord(data[0]));
+          });
+      }
+
+      function initializeGame(code) {
+        const decoded = decryptWord(code);
+        if (!decoded) {
+          showToast("Invalid game code!");
+          return;
+        }
+        gameState.word = decoded;
+        document.getElementById("guess-input").focus();
+        updateDisplay();
+      }
+
+      function checkGuess(guess) {
+        const result = [];
+        const wordArr = gameState.word.split("");
+        const guessArr = guess.toLowerCase().split("");
+
+        // First pass: Mark correct letters
+        const unusedLetters = [...wordArr];
+        const letterStates = guessArr.map((letter, i) => {
+          if (letter === wordArr[i]) {
+            const index = unusedLetters.indexOf(letter);
+            if (index > -1) unusedLetters.splice(index, 1);
+            return "correct";
+          }
+          return null;
+        });
+
+        // Second pass: Mark partial and incorrect
+        guessArr.forEach((letter, i) => {
+          if (letterStates[i]) {
+            result.push({ letter, status: letterStates[i] });
+            return;
+          }
+
+          const index = unusedLetters.indexOf(letter);
+          if (index > -1) {
+            unusedLetters.splice(index, 1);
+            result.push({ letter, status: "partial" });
+          } else {
+            result.push({ letter, status: "incorrect" });
+          }
+        });
+
+        return result;
+      }
+
+      function updateDisplay() {
+        const guessesDiv = document.getElementById("guesses");
+        guessesDiv.innerHTML = "";
+
+        gameState.guesses.forEach((guess) => {
+          const row = document.createElement("div");
+          row.className = "guess-row";
+
+          guess.forEach((letter) => {
+            const letterDiv = document.createElement("div");
+            letterDiv.className = `letter ${letter.status}`;
+            letterDiv.textContent = letter.letter;
+            row.appendChild(letterDiv);
+          });
+
+          guessesDiv.appendChild(row);
+        });
+
+        document.getElementById(
+          "tries"
+        ).textContent = `Tries: ${gameState.tries}`;
+      }
+
+      // Event Listeners
+      document.getElementById("guess-btn").addEventListener("click", () => {
+        const guessInput = document.getElementById("guess-input");
+        const guess = guessInput.value.trim();
+
+        if (!gameState.word) {
+          showToast("Please start a new game first!");
+          return;
+        }
+
+        if (guess.length !== gameState.word.length) {
+          showToast(`Guess must be ${gameState.word.length} letters long!`);
+          return;
+        }
+
+        const result = checkGuess(guess);
+        gameState.guesses.push(result);
+        gameState.tries++;
+        guessInput.value = "";
+        updateDisplay();
+
+        if (result.every((r) => r.status === "correct")) {
+          showToast(
+            `Congratulations! You won in ${gameState.tries} tries!`,
+            5000
+          );
+          document.getElementById("inp").style.display = "none";
+        }
+      });
+
+      document.getElementById("new-game-btn").addEventListener("click", () => {
+        document.getElementById("new-game-modal").style.display = "flex";
+      });
+
+      document
+        .getElementById("create-game-btn")
+        .addEventListener("click", () => {
+          const word = document.getElementById("new-word-input").value.trim();
+          if (!word) return;
+
+          const code = encryptWord(word);
+          const gameUrl = `${window.location.origin}${window.location.pathname}?code=${code}`;
+
+          document.getElementById("code-output").innerHTML = `
+                <p>Share this code or link:</p>
+                <div class="code-display">${code}</div>
+                <div class="code-display">${gameUrl}</div>
+            `;
+
+          document.getElementById("new-word-input").value = "";
+        });
+
+      // Handle Enter key
+      document
+        .getElementById("guess-input")
+        .addEventListener("keypress", (e) => {
+          if (e.key === "Enter") {
+            document.getElementById("guess-btn").click();
+          }
+        });
+
+      document
+        .getElementById("new-word-input")
+        .addEventListener("keypress", (e) => {
+          if (e.key === "Enter") {
+            document.getElementById("create-game-btn").click();
+          }
+        });
+    </script>
+  </body>
+</html>
